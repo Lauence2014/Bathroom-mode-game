@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bathroom Mode™: The Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #0b0f19;
+            color: #f8fafc;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 0.75rem;
+        }
+        .btn-glow {
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 14px 0 rgba(56, 189, 248, 0.25);
+        }
+        .btn-glow:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(56, 189, 248, 0.45);
+        }
+        .btn-glow:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+        .btn-glow:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        /* Custom subtle scrollbars for small screens */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between p-2 sm:p-4 bg-slate-950">
+
+    <!-- Top Header & Metrics Bar -->
+    <header class="w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2 bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 sm:px-5 shadow-lg backdrop-blur">
+        <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-lg bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-xl">
+                🚽
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-bold text-base sm:text-lg tracking-tight text-white">Bathroom Mode™</h1>
+                    <span class="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">Patent Pending</span>
+                </div>
+                <p id="tier-subtitle" class="text-xs text-slate-400">Phase 1: Restroom QR Code</p>
+            </div>
+        </div>
+
+        <!-- Live Counters -->
+        <div class="flex items-center gap-3 sm:gap-6">
+            <div class="text-right">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400">Active Streamers</div>
+                <div id="stat-users" class="mono font-bold text-sm sm:text-lg text-sky-400">0</div>
+            </div>
+            <div class="text-right">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400">Revenue</div>
+                <div id="stat-money" class="mono font-bold text-sm sm:text-lg text-emerald-400">$0</div>
+            </div>
+            <div class="text-right hidden sm:block">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400">Theater Seats</div>
+                <div id="stat-seats" class="mono font-bold text-sm sm:text-lg text-rose-400">100%</div>
+            </div>
+            <button id="btn-sound" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-sm" title="Toggle Sound">
+                🔊
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Interactive Game Area -->
+    <main class="relative flex-1 w-full max-w-6xl mx-auto my-2 sm:my-3 flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl">
+        
+        <!-- Narrator / Zack D. Style Ticker -->
+        <div class="bg-slate-950/90 border-b border-slate-800 px-3 py-2 flex items-center gap-2.5 z-10">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">Z</span>
+            <p id="narrator-text" class="text-xs sm:text-sm text-slate-200 truncate font-medium">
+                "You know when you're watching a movie, and you have to pee, but don't want to miss a scene? Tap patrons or boost the QR signal!"
+            </p>
+        </div>
+
+        <!-- Canvas Container -->
+        <div id="canvas-wrapper" class="relative flex-1 w-full h-full overflow-hidden">
+            <canvas id="gameCanvas"></canvas>
+
+            <!-- Floating Toast Notification -->
+            <div id="toast-banner" class="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 opacity-0 transition-opacity duration-300 bg-sky-500 text-slate-950 font-bold text-xs sm:text-sm px-4 py-1.5 rounded-full shadow-lg whitespace-nowrap">
+                Signal Expanded!
+            </div>
+
+            <!-- Start / Intro Modal Overlay -->
+            <div id="intro-modal" class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4 z-20">
+                <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl p-6 text-center shadow-2xl">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-4xl">
+                        📱🚽
+                    </div>
+                    <h2 class="text-2xl font-bold text-white mb-2">Bathroom Mode™</h2>
+                    <p class="text-sm text-slate-300 mb-4 leading-relaxed">
+                        Customers hate missing movies when nature calls. Scan the <span class="text-sky-400 font-semibold">Restroom QR Code</span> to stream the movie live to their phones!
+                    </p>
+                    <div class="bg-slate-950/70 rounded-xl p-3 text-left text-xs text-slate-400 space-y-1.5 mb-5 border border-slate-800">
+                        <div>👆 <strong>Tap Moviegoers / Canvas:</strong> Send urgent pee signals &amp; boost Wi-Fi router throughput.</div>
+                        <div>📡 <strong>Upgrade Signal Tiers:</strong> Expand from Restrooms &rarr; Lobby &rarr; Parking Lot &rarr; Global Streaming.</div>
+                        <div>🖥️ <strong>Convert Theaters:</strong> Replace empty seats with server racks to hit <strong>100 Million Users</strong>!</div>
+                    </div>
+                    <button id="btn-start" class="w-full py-3 px-6 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-base btn-glow">
+                        Launch Bathroom Mode™
+                    </button>
+                </div>
+            </div>
+
+            <!-- Victory / Ending Modal Overlay -->
+            <div id="victory-modal" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-30">
+                <div class="max-w-lg w-full bg-slate-900 border border-sky-500/50 rounded-2xl p-6 text-center shadow-2xl">
+                    <div class="text-4xl mb-2">🌍📱🎬</div>
+                    <div class="inline-block px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold mb-2 border border-emerald-500/30">
+                        100,000,000 USERS REACHED!
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-3">
+                        "We accidentally solved the theater problem."
+                    </h2>
+                    <p class="text-sm text-slate-300 mb-5 leading-relaxed">
+                        Every movie theater has been converted into a massive server room and customer support center. Nobody ever leaves their couch—or their bathroom—again. You just reinvented streaming!
+                    </p>
+                    <div class="grid grid-cols-2 gap-3 mb-5 text-left bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                        <div>
+                            <div class="text-[11px] text-slate-400">Final Valuation</div>
+                            <div id="final-money" class="mono font-bold text-emerald-400 text-base">$0</div>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-slate-400">Theaters Converted</div>
+                            <div class="mono font-bold text-sky-400 text-base">100% Server Rooms</div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-2.5">
+                        <button id="btn-endless" class="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-sm border border-slate-700">
+                            Keep Scaling (Endless)
+                        </button>
+                        <button id="btn-restart" class="flex-1 py-2.5 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm btn-glow">
+                            Play Again
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Control Deck (Outside Canvas) -->
+    <footer class="w-full max-w-6xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <!-- Action 1: Boost QR Router / Spawn Urgent Viewer -->
+        <button id="btn-boost" class="flex flex-col items-start justify-between p-2.5 sm:p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-sky-500/40 text-left btn-glow">
+            <div class="flex items-center justify-between w-full">
+                <span class="text-xs font-bold text-sky-400 uppercase tracking-wider">📡 Broadcast Signal</span>
+                <span class="text-base">📲</span>
+            </div>
+            <div class="text-xs text-slate-300 mt-1 line-clamp-1">Ping phones &amp; urge bladders</div>
+            <div class="mono text-xs font-bold text-white mt-1">+<span id="boost-val">1</span> Users / Tap</div>
+        </button>
+
+        <!-- Action 2: Upgrade Bathroom Mode Tier -->
+        <button id="btn-tier" class="flex flex-col items-start justify-between p-2.5 sm:p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-left btn-glow">
+            <div class="flex items-center justify-between w-full">
+                <span id="tier-btn-label" class="text-xs font-bold text-amber-400 uppercase tracking-wider">🚀 Upgrade Tier</span>
+                <span class="text-base">📶</span>
+            </div>
+            <div id="tier-btn-desc" class="text-xs text-slate-300 mt-1 line-clamp-1">Bathroom Mode Ultra</div>
+            <div id="tier-btn-cost" class="mono text-xs font-bold text-emerald-400 mt-1">$150</div>
+        </button>
+
+        <!-- Action 3: Convert Theater Seats into Server Racks -->
+        <button id="btn-server" class="flex flex-col items-start justify-between p-2.5 sm:p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-purple-500/40 text-left btn-glow">
+            <div class="flex items-center justify-between w-full">
+                <span class="text-xs font-bold text-purple-400 uppercase tracking-wider">🖥️ Server Rack</span>
+                <span class="text-base">💾</span>
+            </div>
+            <div class="text-xs text-slate-300 mt-1 line-clamp-1">Replace seats (<span id="server-count">0</span>/12)</div>
+            <div id="server-btn-cost" class="mono text-xs font-bold text-emerald-400 mt-1">$50</div>
+        </button>
+
+        <!-- Action 4: Customer Support / Bandwidth Optimizer -->
+        <button id="btn-support" class="flex flex-col items-start justify-between p-2.5 sm:p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 text-left btn-glow">
+            <div class="flex items-center justify-between w-full">
+                <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">🎧 Support Desk</span>
+                <span class="text-base">📈</span>
+            </div>
+            <div class="text-xs text-slate-300 mt-1 line-clamp-1">Auto-stream +<span id="auto-rate">0</span>/s</div>
+            <div id="support-btn-cost" class="mono text-xs font-bold text-emerald-400 mt-1">$35</div>
+        </button>
+    </footer>
+
+    <script>
+        /**
+         * BATHROOM MODE™: THE GAME
+         * Inspired by Zack D. Films' "The Bathroom Mode (Patent Pending)"
+         * Core Loop:
+         * 1. Theater patrons watch a movie on the big screen. Occasionally they have to pee and run to the restroom.
+         * 2. Scanning the QR code lets them watch on their phones ("Bathroom Mode").
+         * 3. Soon, people crowd around the bathrooms just to watch on their phones without peeing!
+         * 4. Upgrade through 4 satirical tiers:
+         *    - Tier 0: Bathroom Mode (Restroom QR Range only)
+         *    - Tier 1: Bathroom Mode Ultra (Entire Building / Lobby Range)
+         *    - Tier 2: Parking Lot Package (Cars outside streaming)
+         *    - Tier 3: Bathroom Mode+ (Global At-Home Streaming -> 100M Users!)
+         * 5. Convert theater auditorium rows into Server Racks & Customer Support desks to handle bandwidth.
+         */
+
+        // --- SOUND SYNTHESIZER (Web Audio API - No external files) ---
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+            playTone(freq, type = 'sine', duration = 0.12, vol = 0.12) {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(freq * 1.25, this.ctx.currentTime + duration);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {
+                    // Ignore audio autoplay blocks
+                }
+            }
+            playScan() {
+                this.playTone(580, 'triangle', 0.09, 0.1);
+            }
+            playCash() {
+                this.playTone(740, 'sine', 0.1, 0.12);
+                setTimeout(() => this.playTone(980, 'sine', 0.15, 0.12), 60);
+            }
+            playUpgrade() {
+                this.playTone(440, 'triangle', 0.12, 0.15);
+                setTimeout(() => this.playTone(554, 'triangle', 0.12, 0.15), 90);
+                setTimeout(() => this.playTone(659, 'triangle', 0.22, 0.15), 180);
+            }
+        }
+        const sfx = new SoundFX();
+
+        // --- GAME TIERS & STORYLINE DATA ---
+        const TIERS = [
+            {
+                name: "Bathroom Mode",
+                subtitle: "Phase 1: Restroom QR Code Only",
+                nextName: "Bathroom Mode Ultra",
+                upgradeCost: 180,
+                multiplier: 1,
+                signalRadiusFactor: 0.22,
+                quote: "\"We added a QR code at the bathroom doors so you wouldn't miss an important scene. People loved it!\""
+            },
+            {
+                name: "Bathroom Mode Ultra",
+                subtitle: "Phase 2: Entire Building Wi-Fi",
+                nextName: "Parking Lot Package",
+                upgradeCost: 1400,
+                multiplier: 12,
+                signalRadiusFactor: 0.52,
+                quote: "\"People started gathering around the bathrooms—not to pee, just to watch on their phones! So we launched Bathroom Mode Ultra.\""
+            },
+            {
+                name: "Parking Lot Package",
+                subtitle: "Phase 3: Theater & Parking Lot",
+                nextName: "Bathroom Mode+",
+                upgradeCost: 12000,
+                multiplier: 250,
+                signalRadiusFactor: 0.85,
+                quote: "\"Then we added the Parking Lot Package, and started converting the actual theaters into server rooms and customer support.\""
+            },
+            {
+                name: "Bathroom Mode+",
+                subtitle: "Phase 4: Global At-Home Streaming",
+                nextName: "MAX TIER REACHED",
+                upgradeCost: Infinity,
+                multiplier: 8500,
+                signalRadiusFactor: 1.5,
+                quote: "\"And in the comfort of your own home, we launched Bathroom Mode Plus. We accidentally solved the theater problem.\""
+            }
+        ];
+
+        // --- GAME STATE ---
+        const state = {
+            started: false,
+            victoryShown: false,
+            endlessMode: false,
+            money: 25,
+            users: 1,
+            tierIndex: 0,
+            servers: 0,
+            maxServers: 12,
+            serverCost: 50,
+            supportLevel: 0,
+            supportCost: 35,
+            tapPower: 1,
+            movieFrame: 0,
+            pulseWave: 0,
+            lastTime: 0
+        };
+
+        // Entities for canvas visualization
+        let patrons = [];
+        let floatingTexts = [];
+        let cars = [];
+        let globalNodes = [];
+
+        // --- DOM REFERENCES ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const wrapper = document.getElementById('canvas-wrapper');
+
+        const elUsers = document.getElementById('stat-users');
+        const elMoney = document.getElementById('stat-money');
+        const elSeats = document.getElementById('stat-seats');
+        const elSubtitle = document.getElementById('tier-subtitle');
+        const elNarrator = document.getElementById('narrator-text');
+        const elToast = document.getElementById('toast-banner');
+
+        const btnStart = document.getElementById('btn-start');
+        const btnBoost = document.getElementById('btn-boost');
+        const btnTier = document.getElementById('btn-tier');
+        const btnServer = document.getElementById('btn-server');
+        const btnSupport = document.getElementById('btn-support');
+        const btnSound = document.getElementById('btn-sound');
+        const btnRestart = document.getElementById('btn-restart');
+        const btnEndless = document.getElementById('btn-endless');
+
+        const elBoostVal = document.getElementById('boost-val');
+        const elTierBtnDesc = document.getElementById('tier-btn-desc');
+        const elTierBtnCost = document.getElementById('tier-btn-cost');
+        const elServerCount = document.getElementById('server-count');
+        const elServerCost = document.getElementById('server-btn-cost');
+        const elAutoRate = document.getElementById('auto-rate');
+        const elSupportCost = document.getElementById('support-btn-cost');
+
+        // --- NUMBER FORMATTER ---
+        function formatNum(n) {
+            if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+            if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+            if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+            return Math.floor(n).toString();
+        }
+
+        function showToast(msg) {
+            elToast.textContent = msg;
+            elToast.style.opacity = '1';
+            clearTimeout(elToast._timer);
+            elToast._timer = setTimeout(() => {
+                elToast.style.opacity = '0';
+            }, 2200);
+        }
+
+        function addFloatingText(x, y, text, color = '#38bdf8') {
+            floatingTexts.push({
+                x, y, text, color,
+                alpha: 1,
+                vy: -42
+            });
+        }
+
+        // --- RESIZE HANDLING ---
+        let width = 800;
+        let height = 500;
+        function resizeCanvas() {
+            const rect = wrapper.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            width = rect.width;
+            height = rect.height;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            initSceneEntities();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- LAYOUT ZONES CALCULATOR ---
+        function getZones() {
+            const pad = Math.min(width, height) * 0.04;
+            const isMobile = width < 640;
+
+            if (isMobile) {
+                // Stacked vertical layout for mobile portrait
+                const theaterW = width - pad * 2;
+                const theaterH = height * 0.44;
+                const bathroomW = (width - pad * 3) * 0.52;
+                const bathroomH = height * 0.44;
+                const lobbyW = (width - pad * 3) * 0.48;
+                const lobbyH = height * 0.44;
+
+                return {
+                    theater: { x: pad, y: pad, w: theaterW, h: theaterH },
+                    bathroom: { x: pad, y: pad * 2 + theaterH, w: bathroomW, h: bathroomH },
+                    lobby: { x: pad * 2 + bathroomW, y: pad * 2 + theaterH, w: lobbyW, h: lobbyH }
+                };
+            } else {
+                // Side-by-side landscape layout
+                const theaterW = width * 0.48;
+                const theaterH = height - pad * 2;
+                const rightW = width - theaterW - pad * 3;
+                const bathroomH = (height - pad * 3) * 0.54;
+                const lobbyH = (height - pad * 3) * 0.46;
+
+                return {
+                    theater: { x: pad, y: pad, w: theaterW, h: theaterH },
+                    bathroom: { x: theaterW + pad * 2, y: pad, w: rightW, h: bathroomH },
+                    lobby: { x: theaterW + pad * 2, y: pad * 2 + bathroomH, w: rightW, h: lobbyH }
+                };
+            }
+        }
+
+        // --- ENTITY INITIALIZATION ---
+        function initSceneEntities() {
+            const z = getZones();
+            // Create 18 initial theater patrons
+            if (patrons.length === 0) {
+                for (let i = 0; i < 18; i++) {
+                    patrons.push(createPatron(i, z));
+                }
+            }
+            // Parking lot cars (visible in Tier 2+)
+            cars = [
+                { rx: 0.18, ry: 0.72, color: '#ef4444' },
+                { rx: 0.42, ry: 0.76, color: '#3b82f6' },
+                { rx: 0.68, ry: 0.72, color: '#eab308' },
+                { rx: 0.85, ry: 0.75, color: '#a855f7' }
+            ];
+            // Global streaming homes (visible in Tier 3)
+            globalNodes = [];
+            for (let i = 0; i < 14; i++) {
+                globalNodes.push({
+                    angle: (i / 14) * Math.PI * 2,
+                    dist: 0.32 + (i % 3) * 0.08,
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        function createPatron(idx, z) {
+            const cols = 6;
+            const row = Math.floor(idx / cols);
+            const col = idx % cols;
+            const seatX = z.theater.x + z.theater.w * (0.16 + (col / (cols - 1)) * 0.68);
+            const seatY = z.theater.y + z.theater.h * (0.42 + row * 0.22);
+
+            return {
+                id: idx,
+                x: seatX,
+                y: seatY,
+                seatX,
+                seatY,
+                targetX: seatX,
+                targetY: seatY,
+                state: 'watching', // 'watching', 'going_pee', 'streaming_bathroom', 'loitering_hall', 'returning'
+                timer: 2 + Math.random() * 8,
+                bladder: Math.random() * 60,
+                hasPhoneStream: false,
+                speed: 75 + Math.random() * 35
+            };
+        }
+
+        function sendPatronToBathroom(force = false) {
+            const z = getZones();
+            const candidates = patrons.filter(p => p.state === 'watching');
+            if (candidates.length === 0) return;
+
+            // Check if patron's seat row was replaced by a server rack
+            const p = candidates[Math.floor(Math.random() * candidates.length)];
+            p.state = 'going_pee';
+            p.hasPhoneStream = true;
+            p.targetX = z.bathroom.x + z.bathroom.w * (0.25 + Math.random() * 0.5);
+            p.targetY = z.bathroom.y + z.bathroom.h * (0.35 + Math.random() * 0.45);
+            p.timer = 4 + Math.random() * 4;
+
+            if (force) {
+                sfx.playScan();
+            }
+        }
+
+        // --- USER ACTIONS ---
+        function triggerBoost(clickX, clickY) {
+            if (!state.started) return;
+            const tier = TIERS[state.tierIndex];
+            const serverBonus = 1 + state.servers * 0.65;
+            const gainUsers = Math.max(1, Math.floor(state.tapPower * tier.multiplier * serverBonus));
+            const gainMoney = Math.max(2, Math.ceil(gainUsers * 1.4));
+
+            state.users += gainUsers;
+            state.money += gainMoney;
+            state.pulseWave = 1.0;
+
+            sendPatronToBathroom(true);
+
+            const fx = clickX ?? width * 0.5;
+            const fy = clickY ?? height * 0.5;
+            addFloatingText(fx, fy, `+${formatNum(gainUsers)} 📱  +$${formatNum(gainMoney)}`, '#38bdf8');
+            updateUI();
+        }
+
+        function upgradeTier() {
+            const currentTier = TIERS[state.tierIndex];
+            if (state.tierIndex >= TIERS.length - 1) return;
+            if (state.money < currentTier.upgradeCost) return;
+
+            state.money -= currentTier.upgradeCost;
+            state.tierIndex++;
+            const newTier = TIERS[state.tierIndex];
+
+            sfx.playUpgrade();
+            elNarrator.textContent = newTier.quote;
+            elSubtitle.textContent = newTier.subtitle;
+            showToast(`Unlocked: ${newTier.name}!`);
+            state.pulseWave = 1.0;
+
+            // Convert some watchers into permanent hallway/phone streamers
+            const z = getZones();
+            patrons.forEach((p, i) => {
+                if (i % 2 === 0 || state.tierIndex >= 2) {
+                    p.state = 'loitering_hall';
+                    p.hasPhoneStream = true;
+                    p.targetX = z.lobby.x + z.lobby.w * (0.2 + Math.random() * 0.6);
+                    p.targetY = z.lobby.y + z.lobby.h * (0.3 + Math.random() * 0.5);
+                }
+            });
+
+            updateUI();
+        }
+
+        function buyServerRack() {
+            if (state.servers >= state.maxServers) return;
+            if (state.money < state.serverCost) return;
+
+            state.money -= state.serverCost;
+            state.servers++;
+            state.serverCost = Math.floor(state.serverCost * 1.75);
+            state.tapPower += 2;
+
+            sfx.playCash();
+            showToast(`Theater Row Converted to Server Rack #${state.servers}!`);
+
+            if (state.servers === 1) {
+                elNarrator.textContent = "\"Customers wanted Bathroom Mode without the theater—so we started ripping out seats for server racks!\"";
+            } else if (state.servers === state.maxServers) {
+                elNarrator.textContent = "\"Zero theater seats left! The entire auditorium is now a humming server farm.\"";
+            }
+
+            // Evict patrons from converted seats into the lobby/bathroom
+            const z = getZones();
+            patrons.forEach((p, idx) => {
+                if (idx < Math.ceil((state.servers / state.maxServers) * patrons.length)) {
+                    p.state = 'loitering_hall';
+                    p.hasPhoneStream = true;
+                    p.targetX = z.lobby.x + z.lobby.w * (0.15 + Math.random() * 0.7);
+                    p.targetY = z.lobby.y + z.lobby.h * (0.25 + Math.random() * 0.6);
+                }
+            });
+
+            updateUI();
+        }
+
+        function buySupportDesk() {
+            if (state.money < state.supportCost) return;
+            state.money -= state.supportCost;
+            state.supportLevel++;
+            state.supportCost = Math.floor(state.supportCost * 1.55);
+
+            sfx.playCash();
+            showToast(`Customer Support & Bandwidth Level ${state.supportLevel}!`);
+            updateUI();
+        }
+
+        // --- UI SYNC ---
+        function getAutoUsersPerSec() {
+            const tier = TIERS[state.tierIndex];
+            const serverMult = 1 + state.servers * 0.75;
+            return Math.floor(state.supportLevel * 3 * tier.multiplier * serverMult);
+        }
+
+        function updateUI() {
+            const tier = TIERS[state.tierIndex];
+            const serverBonus = 1 + state.servers * 0.65;
+            const clickUsers = Math.max(1, Math.floor(state.tapPower * tier.multiplier * serverBonus));
+
+            elUsers.textContent = formatNum(state.users);
+            elMoney.textContent = '$' + formatNum(state.money);
+            const seatPct = Math.max(0, Math.round((1 - state.servers / state.maxServers) * 100));
+            elSeats.textContent = seatPct + '%';
+
+            elBoostVal.textContent = formatNum(clickUsers);
+
+            // Tier button
+            if (state.tierIndex < TIERS.length - 1) {
+                elTierBtnDesc.textContent = tier.nextName;
+                elTierBtnCost.textContent = '$' + formatNum(tier.upgradeCost);
+                btnTier.disabled = state.money < tier.upgradeCost;
+            } else {
+                elTierBtnDesc.textContent = 'Bathroom Mode+ Active';
+                elTierBtnCost.textContent = 'MAXED';
+                btnTier.disabled = true;
+            }
+
+            // Server button
+            elServerCount.textContent = state.servers;
+            if (state.servers < state.maxServers) {
+                elServerCost.textContent = '$' + formatNum(state.serverCost);
+                btnServer.disabled = state.money < state.serverCost;
+            } else {
+                elServerCost.textContent = '100% CONVERTED';
+                btnServer.disabled = true;
+            }
+
+            // Support button
+            elAutoRate.textContent = formatNum(getAutoUsersPerSec());
+            elSupportCost.textContent = '$' + formatNum(state.supportCost);
+            btnSupport.disabled = state.money < state.supportCost;
+
+            // Check 100 Million Users Victory Condition
+            if (state.users >= 100_000_000 && !state.victoryShown && !state.endlessMode) {
+                state.victoryShown = true;
+                document.getElementById('final-money').textContent = '$' + formatNum(state.money);
+                document.getElementById('victory-modal').classList.remove('hidden');
+                sfx.playUpgrade();
+            }
+        }
+
+        // --- SIMULATION LOOP ---
+        function updateSimulation(dt) {
+            if (!state.started) return;
+
+            state.movieFrame += dt * 4;
+            if (state.pulseWave > 0) {
+                state.pulseWave = Math.max(0, state.pulseWave - dt * 1.4);
+            }
+
+            // Passive income & users from Support + Servers
+            const autoUsers = getAutoUsersPerSec();
+            if (autoUsers > 0) {
+                state.users += autoUsers * dt;
+                state.money += autoUsers * 1.25 * dt;
+            }
+
+            // Update patrons walking around
+            const z = getZones();
+            patrons.forEach((p, idx) => {
+                // Recompute seat position dynamically on resize
+                const cols = 6;
+                const row = Math.floor(idx / cols);
+                const col = idx % cols;
+                p.seatX = z.theater.x + z.theater.w * (0.16 + (col / (cols - 1)) * 0.68);
+                p.seatY = z.theater.y + z.theater.h * (0.42 + row * 0.22);
+
+                const isSeatConverted = idx < Math.ceil((state.servers / state.maxServers) * patrons.length);
+
+                if (p.state === 'watching') {
+                    p.x += (p.seatX - p.x) * 5 * dt;
+                    p.y += (p.seatY - p.y) * 5 * dt;
+                    p.timer -= dt;
+                    if (p.timer <= 0) {
+                        sendPatronToBathroom(false);
+                    }
+                } else {
+                    const dx = p.targetX - p.x;
+                    const dy = p.targetY - p.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 3) {
+                        p.x += (dx / dist) * p.speed * dt;
+                        p.y += (dy / dist) * p.speed * dt;
+                    } else {
+                        p.timer -= dt;
+                        if (p.timer <= 0) {
+                            if (p.state === 'going_pee') {
+                                // Once finished peeing, in Tier 1+ they stay outside just to watch on phone!
+                                if (state.tierIndex >= 1 || isSeatConverted) {
+                                    p.state = 'loitering_hall';
+                                    p.targetX = z.lobby.x + z.lobby.w * (0.18 + Math.random() * 0.64);
+                                    p.targetY = z.lobby.y + z.lobby.h * (0.28 + Math.random() * 0.55);
+                                    p.timer = 5 + Math.random() * 6;
+                                } else {
+                                    p.state = 'returning';
+                                    p.targetX = p.seatX;
+                                    p.targetY = p.seatY;
+                                    p.timer = 4 + Math.random() * 7;
+                                }
+                            } else if (p.state === 'loitering_hall') {
+                                if (!isSeatConverted && state.tierIndex === 0) {
+                                    p.state = 'returning';
+                                    p.targetX = p.seatX;
+                                    p.targetY = p.seatY;
+                                } else {
+                                    // Wander around lobby/parking lot watching phone
+                                    p.targetX = z.lobby.x + z.lobby.w * (0.18 + Math.random() * 0.64);
+                                    p.targetY = z.lobby.y + z.lobby.h * (0.28 + Math.random() * 0.55);
+                                    p.timer = 3 + Math.random() * 5;
+                                }
+                            } else if (p.state === 'returning') {
+                                p.state = 'watching';
+                                p.hasPhoneStream = false;
+                                p.timer = 5 + Math.random() * 8;
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Update floating texts
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y += ft.vy * dt;
+                ft.alpha -= dt * 0.85;
+                if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+            }
+
+            updateUI();
+        }
+
+        // --- RENDERING ---
+        function drawRoundedRect(x, y, w, h, r, fill, stroke) {
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, r);
+            if (fill) {
+                ctx.fillStyle = fill;
+                ctx.fill();
+            }
+            if (stroke) {
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        }
+
+        function drawScene() {
+            ctx.clearRect(0, 0, width, height);
+            const z = getZones();
+            const tier = TIERS[state.tierIndex];
+
+            // Subtle Grid Background
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.45)';
+            ctx.lineWidth = 1;
+            const gridSize = 32;
+            for (let gx = 0; gx < width; gx += gridSize) {
+                ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, height); ctx.stroke();
+            }
+            for (let gy = 0; gy < height; gy += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(width, gy); ctx.stroke();
+            }
+
+            // 1. AUDITORIUM / SERVER ROOM ZONE
+            const convertedRatio = state.servers / state.maxServers;
+            const theaterBg = convertedRatio > 0.5 ? '#111827' : '#13182b';
+            drawRoundedRect(z.theater.x, z.theater.y, z.theater.w, z.theater.h, 14, theaterBg, '#334155');
+
+            // Zone Title
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = 'bold 11px "Space Grotesk", sans-serif';
+            ctx.fillText(
+                state.servers > 0 ? `AUDITORIUM (${Math.round(convertedRatio * 100)}% SERVER ROOM)` : 'MOVIE THEATER AUDITORIUM',
+                z.theater.x + 14, z.theater.y + 20
+            );
+
+            // Big Movie Screen at Top of Theater
+            const scrX = z.theater.x + z.theater.w * 0.12;
+            const scrY = z.theater.y + 30;
+            const scrW = z.theater.w * 0.76;
+            const scrH = z.theater.h * 0.2;
+
+            // Screen Glow
+            const glowGrad = ctx.createLinearGradient(scrX, scrY, scrX, scrY + scrH * 2.2);
+            glowGrad.addColorStop(0, 'rgba(56, 189, 248, 0.22)');
+            glowGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+            ctx.fillStyle = glowGrad;
+            ctx.fillRect(scrX - 10, scrY + scrH, scrW + 20, scrH * 1.4);
+
+            drawRoundedRect(scrX, scrY, scrW, scrH, 8, '#020617', '#38bdf8');
+            // Animated Movie Action Scene inside screen
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(scrX + 2, scrY + 2, scrW - 4, scrH - 4, 6);
+            ctx.clip();
+            const hue = (state.movieFrame * 18) % 360;
+            ctx.fillStyle = `hsla(${hue}, 70%, 35%, 0.45)`;
+            ctx.fillRect(scrX, scrY, scrW, scrH);
+            // Animated hero/explosion circle
+            const heroX = scrX + scrW * 0.5 + Math.sin(state.movieFrame) * (scrW * 0.28);
+            const heroY = scrY + scrH * 0.52;
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(heroX, heroY, Math.min(scrH * 0.26, 12), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 10px "JetBrains Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('NOW PLAYING: EXPLOSION 4', scrX + scrW * 0.5, scrY + scrH * 0.56);
+            ctx.restore();
+
+            // Draw Theater Seats OR Server Racks (3 rows x 6 cols)
+            const cols = 6;
+            const rows = 3;
+            const totalSlots = cols * rows;
+            const convertedSlots = Math.round(convertedRatio * totalSlots);
+
+            for (let i = 0; i < totalSlots; i++) {
+                const r = Math.floor(i / cols);
+                const c = i % cols;
+                const sx = z.theater.x + z.theater.w * (0.16 + (c / (cols - 1)) * 0.68);
+                const sy = z.theater.y + z.theater.h * (0.42 + r * 0.22);
+
+                if (i < convertedSlots) {
+                    // Server Rack!
+                    drawRoundedRect(sx - 13, sy - 11, 26, 22, 4, '#1e1b4b', '#818cf8');
+                    // Blinking server LEDs
+                    const blink = Math.sin(state.movieFrame * 3 + i) > 0;
+                    ctx.fillStyle = blink ? '#34d399' : '#38bdf8';
+                    ctx.fillRect(sx - 8, sy - 6, 4, 3);
+                    ctx.fillStyle = '#f43f5e';
+                    ctx.fillRect(sx - 8, sy + 1, 4, 3);
+                    ctx.fillStyle = '#64748b';
+                    ctx.fillRect(sx - 1, sy - 6, 9, 2);
+                    ctx.fillRect(sx - 1, sy + 1, 9, 2);
+                } else {
+                    // Red Velvet Theater Seat
+                    drawRoundedRect(sx - 11, sy - 8, 22, 16, 5, '#7f1d1d', '#ef4444');
+                }
+            }
+
+            // 2. RESTROOMS + QR CODE ZONE
+            drawRoundedRect(z.bathroom.x, z.bathroom.y, z.bathroom.w, z.bathroom.h, 14, '#0f172a', '#0284c7');
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = 'bold 11px "Space Grotesk", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('RESTROOMS & QR ROUTER', z.bathroom.x + 14, z.bathroom.y + 20);
+
+            // QR Code Stand at Door
+            const qrX = z.bathroom.x + z.bathroom.w * 0.22;
+            const qrY = z.bathroom.y + z.bathroom.h * 0.55;
+            drawRoundedRect(qrX - 18, qrY - 18, 36, 36, 6, '#ffffff', '#38bdf8');
+            // Mini QR pattern
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(qrX - 12, qrY - 12, 9, 9);
+            ctx.fillRect(qrX + 3, qrY - 12, 9, 9);
+            ctx.fillRect(qrX - 12, qrY + 3, 9, 9);
+            ctx.fillRect(qrX + 2, qrY + 2, 5, 5);
+            ctx.fillRect(qrX + 8, qrY + 7, 4, 5);
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = 'bold 9px "JetBrains Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('SCAN ME', qrX, qrY + 29);
+
+            // Toilet Stalls on the right side of Bathroom
+            for (let s = 0; s < 3; s++) {
+                const stallX = z.bathroom.x + z.bathroom.w * (0.48 + s * 0.16);
+                const stallY = z.bathroom.y + z.bathroom.h * 0.34;
+                const stallW = z.bathroom.w * 0.13;
+                const stallH = z.bathroom.h * 0.48;
+                drawRoundedRect(stallX, stallY, stallW, stallH, 6, '#1e293b', '#475569');
+                ctx.font = '14px sans-serif';
+                ctx.fillText('🚽', stallX + stallW * 0.5, stallY + stallH * 0.62);
+            }
+
+            // 3. LOBBY / PARKING LOT / GLOBAL ZONE
+            let lobbyTitle = 'THEATER CORRIDOR & LOBBY';
+            if (state.tierIndex === 1) lobbyTitle = 'BATHROOM MODE ULTRA (BUILDING-WIDE)';
+            if (state.tierIndex === 2) lobbyTitle = 'PARKING LOT PACKAGE (CARS STREAMING)';
+            if (state.tierIndex >= 3) lobbyTitle = 'BATHROOM MODE+ (GLOBAL HOME STREAMING)';
+
+            drawRoundedRect(z.lobby.x, z.lobby.y, z.lobby.w, z.lobby.h, 14, '#111827', '#334155');
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = 'bold 11px "Space Grotesk", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(lobbyTitle, z.lobby.x + 14, z.lobby.y + 20);
+
+            // Customer Support Desks (if purchased)
+            if (state.supportLevel > 0) {
+                const desks = Math.min(4, state.supportLevel);
+                for (let d = 0; d < desks; d++) {
+                    const dx = z.lobby.x + 24 + d * 42;
+                    const dy = z.lobby.y + 34;
+                    drawRoundedRect(dx, dy, 32, 16, 4, '#064e3b', '#10b981');
+                    ctx.font = '10px sans-serif';
+                    ctx.fillText('🎧', dx + 9, dy + 12);
+                }
+            }
+
+            // Parking Lot Cars (Tier 2+)
+            if (state.tierIndex >= 2) {
+                cars.forEach((car, i) => {
+                    const cx = z.lobby.x + z.lobby.w * car.rx;
+                    const cy = z.lobby.y + z.lobby.h * car.ry;
+                    drawRoundedRect(cx - 18, cy - 10, 36, 20, 6, car.color, '#ffffff');
+                    // Glowing phone screen inside car
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.fillRect(cx - 4, cy - 4, 8, 5);
+                });
+            }
+
+            // Global Streaming Orbit (Tier 3)
+            if (state.tierIndex >= 3) {
+                const gx = z.lobby.x + z.lobby.w * 0.5;
+                const gy = z.lobby.y + z.lobby.h * 0.55;
+                const rad = Math.min(z.lobby.w, z.lobby.h) * 0.25;
+                ctx.beginPath();
+                ctx.arc(gx, gy, rad, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(14, 165, 233, 0.25)';
+                ctx.fill();
+                ctx.strokeStyle = '#38bdf8';
+                ctx.stroke();
+                ctx.font = '24px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('🌍', gx, gy + 8);
+
+                globalNodes.forEach((node, idx) => {
+                    const a = node.angle + state.movieFrame * 0.25;
+                    const nx = gx + Math.cos(a) * (rad + 22);
+                    const ny = gy + Math.sin(a) * (rad + 16);
+                    ctx.font = '12px sans-serif';
+                    ctx.fillText(idx % 2 === 0 ? '🏠' : '📱', nx, ny);
+                });
+            }
+
+            // 4. EXPANDING WI-FI / QR SIGNAL RINGS
+            const maxSignalR = Math.max(width, height) * tier.signalRadiusFactor;
+            const pulseR = ((state.movieFrame * 45) % maxSignalR);
+            ctx.beginPath();
+            ctx.arc(qrX, qrY, pulseR, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(56, 189, 248, ${Math.max(0.05, 0.45 * (1 - pulseR / maxSignalR))})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            if (state.pulseWave > 0) {
+                const tapR = (1 - state.pulseWave) * maxSignalR * 1.1;
+                ctx.beginPath();
+                ctx.arc(qrX, qrY, tapR, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(250, 204, 21, ${state.pulseWave * 0.8})`;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+
+            // 5. DRAW PATRONS & GLOWING PHONE SCREENS
+            patrons.forEach((p) => {
+                // Character body circle
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+                ctx.fillStyle = p.state === 'going_pee' ? '#facc15' : (p.hasPhoneStream ? '#38bdf8' : '#cbd5e1');
+                ctx.fill();
+                ctx.strokeStyle = '#0f172a';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Miniature glowing phone screen playing the movie!
+                if (p.hasPhoneStream) {
+                    ctx.fillStyle = '#0284c7';
+                    ctx.fillRect(p.x + 5, p.y - 8, 7, 10);
+                    ctx.fillStyle = '#7dd3fc';
+                    ctx.fillRect(p.x + 6, p.y - 7, 5, 8);
+                }
+
+                // Urgent pee droplet icon when running to bathroom
+                if (p.state === 'going_pee') {
+                    ctx.font = '10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('💦', p.x, p.y - 11);
+                }
+            });
+
+            // 6. FLOATING SCORE POPUPS
+            floatingTexts.forEach((ft) => {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, ft.alpha);
+                ctx.fillStyle = ft.color;
+                ctx.font = 'bold 13px "JetBrains Mono", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            });
+        }
+
+        // --- MAIN ANIMATION LOOP ---
+        function gameLoop(timestamp) {
+            if (!state.lastTime) state.lastTime = timestamp;
+            const dt = Math.min(0.1, (timestamp - state.lastTime) / 1000);
+            state.lastTime = timestamp;
+
+            updateSimulation(dt);
+            drawScene();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- EVENT LISTENERS ---
+        btnStart.addEventListener('click', () => {
+            sfx.init();
+            sfx.playUpgrade();
+            state.started = true;
+            document.getElementById('intro-modal').classList.add('hidden');
+            sendPatronToBathroom(true);
+            updateUI();
+        });
+
+        btnBoost.addEventListener('click', () => {
+            triggerBoost(width * 0.5, height * 0.45);
+        });
+
+        btnTier.addEventListener('click', upgradeTier);
+        btnServer.addEventListener('click', buyServerRack);
+        btnSupport.addEventListener('click', buySupportDesk);
+
+        btnSound.addEventListener('click', () => {
+            sfx.enabled = !sfx.enabled;
+            btnSound.textContent = sfx.enabled ? '🔊' : '🔇';
+        });
+
+        btnEndless.addEventListener('click', () => {
+            state.endlessMode = true;
+            document.getElementById('victory-modal').classList.add('hidden');
+        });
+
+        btnRestart.addEventListener('click', () => {
+            state.money = 25;
+            state.users = 1;
+            state.tierIndex = 0;
+            state.servers = 0;
+            state.serverCost = 50;
+            state.supportLevel = 0;
+            state.supportCost = 35;
+            state.tapPower = 1;
+            state.victoryShown = false;
+            state.endlessMode = false;
+            patrons = [];
+            initSceneEntities();
+            elSubtitle.textContent = TIERS[0].subtitle;
+            elNarrator.textContent = TIERS[0].quote;
+            document.getElementById('victory-modal').classList.add('hidden');
+            updateUI();
+        });
+
+        // Interactive Canvas Tapping / Clicking
+        function handleCanvasPointer(e) {
+            if (!state.started) return;
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+            triggerBoost(x, y);
+        }
+
+        canvas.addEventListener('mousedown', handleCanvasPointer);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleCanvasPointer(e);
+        }, { passive: false });
+
+        // Start on Window Load
+        window.onload = function () {
+            resizeCanvas();
+            updateUI();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
